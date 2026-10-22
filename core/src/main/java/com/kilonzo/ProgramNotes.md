@@ -17,3 +17,16 @@
   - They uncover a tile
 - right-click: +20/-20 to a tile
   - the flagged/unflagged a tile
+
+## Completing the Project
+~~1. Finish the flood fill Algorithm~~
+~~2. When a bomb is clicked on, show all the bombs (game over)~~
+~~3. Finish the win condition~~
+~~4. Restart the game~~
+~~5. Add sound / music~~
+   ~~- Use an A.I. to walk you through the code~~
+   ~~- Learn as you go, DO NOT HAVE THE  AI simply complete it~~
+~~6. Personalize graphics, feel of the game~~
+7. Use an A.I. and feed in your entire code base
+   - Ask for improvements
+   - If you make improvements, tag them and keep your OG code

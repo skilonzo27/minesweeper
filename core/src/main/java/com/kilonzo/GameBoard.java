@@ -40,7 +40,7 @@ public class GameBoard {
         numFlags = this.numBombs;
         firstClick = true;
         loadGraphics();
-        //placeAllBombs();
+        placeAllBombs();
         numberBoard();
     }
 
@@ -122,24 +122,23 @@ public class GameBoard {
     }
 
     public boolean gameOver() {
-        boolean ans = false;
         for(int i=0; i<board.length;i++){
             for(int j=0; j<board[i].length; j++){
                 int boardValue = board[i][j];
                 if(boardValue < 8) return false;
                 else if(boardValue == 9) {
-                    return false;
+                    return true;
                 }
             }
         }
-        return ans;
+        return true;
     }
     //we +10 to uncover a tile
     public void uncoverTile(Location loc) {
         if(gameOver()) return;
         if (loc != null && isValid(loc)) {
             if(firstClick) {
-                placeAllBombs(loc);
+                //placeAllBombs(loc);
                 firstClick = false;
             }
             int boardValue = board[loc.getRow()][loc.getCol()];
@@ -185,6 +184,19 @@ public class GameBoard {
         }
     }
 
+    private void fixedFloodFill(Location loc) {
+        ArrayList<Location> neighbors = getNeighbors(loc);
+        for(Location l : neighbors){
+            if(isValid(l)){
+                int boardValue = board[l.getRow()][l.getCol()];
+                if (boardValue == 0) {
+                board[l.getRow()][l.getCol()] += 10;
+                fixedFloodFill(l);
+                }
+                else if(boardValue >= -1 && boardValue <= 8) board[l.getRow()][l.getCol()] += 10; return;
+            }
+        }
+    }
     private void numberBoard() {
         for(int i=0; i<board.length; i++) {
             for(int j=0; j<board[i].length; j++){

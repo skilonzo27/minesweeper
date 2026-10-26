@@ -143,7 +143,7 @@ public class GameBoard {
             }
             int boardValue = board[loc.getRow()][loc.getCol()];
             if (boardValue == 0) {
-                floodFill(loc);
+                fixedFloodFill(loc);
             }
             else if (boardValue >= -1 && boardValue <= 8) {
                 board[loc.getRow()][loc.getCol()] += 10;
@@ -186,12 +186,12 @@ public class GameBoard {
 
     private void fixedFloodFill(Location loc) {
         ArrayList<Location> neighbors = getNeighbors(loc);
-        for(Location l : neighbors){
-            if(isValid(l)){
+        if(isValid(loc)){
+            for(Location l : neighbors){
                 int boardValue = board[l.getRow()][l.getCol()];
                 if (boardValue == 0) {
-                board[l.getRow()][l.getCol()] += 10;
-                fixedFloodFill(l);
+                    board[l.getRow()][l.getCol()] += 10;
+                    fixedFloodFill(l);
                 }
                 else if(boardValue >= -1 && boardValue <= 8) board[l.getRow()][l.getCol()] += 10; return;
             }

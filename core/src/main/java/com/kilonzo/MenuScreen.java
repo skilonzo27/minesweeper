@@ -16,7 +16,7 @@ import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
-import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
+import com.badlogic.gdx.scenes.scene2d.InputListener;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
@@ -94,39 +94,46 @@ public class MenuScreen implements Screen {
         stage.addActor(funButton);
         stage.addActor(classicButton);
 
-        easyButton.addListener(new ClickListener() {
-            @Override public void clicked(InputEvent event, float x, float y) {
+        // Handle the press directly so each choice updates immediately.
+        easyButton.addListener(new InputListener() {
+            @Override public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
                 rows = 9; cols = 9; bombs = 10;
                 updateSelectionColors();
+                return true;
             }
         });
-        mediumButton.addListener(new ClickListener() {
-            @Override public void clicked(InputEvent event, float x, float y) {
+        mediumButton.addListener(new InputListener() {
+            @Override public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
                 rows = 16; cols = 16; bombs = 40;
                 updateSelectionColors();
+                return true;
             }
         });
-        hardButton.addListener(new ClickListener() {
-            @Override public void clicked(InputEvent event, float x, float y) {
+        hardButton.addListener(new InputListener() {
+            @Override public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
                 rows = 16; cols = 30; bombs = 99;
                 updateSelectionColors();
+                return true;
             }
         });
-        funButton.addListener(new ClickListener() {
-            @Override public void clicked(InputEvent event, float x, float y) {
+        funButton.addListener(new InputListener() {
+            @Override public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
                 mode = 0;
                 updateSelectionColors();
+                return true;
             }
         });
-        classicButton.addListener(new ClickListener() {
-            @Override public void clicked(InputEvent event, float x, float y) {
+        classicButton.addListener(new InputListener() {
+            @Override public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
                 mode = 1;
                 updateSelectionColors();
+                return true;
             }
         });
-        playButton.addListener(new ClickListener() {
-            @Override public void clicked(InputEvent event, float x, float y) {
+        playButton.addListener(new InputListener() {
+            @Override public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
                 game.setScreen(new GameplayScreen(game, rows, cols, bombs, mode));
+                return true;
             }
         });
 
@@ -168,11 +175,11 @@ public class MenuScreen implements Screen {
         settingsLabel.setText("Selected: " + difficultyName + " | " + modeName
                 + " Mode | " + bombs + " bombs");
 
-        easyButton.setColor(rows == 9 && cols == 9 ? Color.GREEN : Color.WHITE);
-        mediumButton.setColor(rows == 16 && cols == 16 ? Color.GREEN : Color.WHITE);
-        hardButton.setColor(rows == 16 && cols == 30 ? Color.GREEN : Color.WHITE);
-        funButton.setColor(mode == 0 ? Color.GREEN : Color.WHITE);
-        classicButton.setColor(mode == 1 ? Color.GREEN : Color.WHITE);
+        easyButton.setChecked(rows == 9 && cols == 9);
+        mediumButton.setChecked(rows == 16 && cols == 16);
+        hardButton.setChecked(rows == 16 && cols == 30);
+        funButton.setChecked(mode == 0);
+        classicButton.setChecked(mode == 1);
     }
 
     @Override public void render(float delta) {

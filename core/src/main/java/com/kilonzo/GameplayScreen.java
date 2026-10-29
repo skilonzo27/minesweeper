@@ -14,17 +14,20 @@ import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
+import com.badlogic.gdx.audio.Music;
 
 public class GameplayScreen implements Screen {
 
     private static final float WORLD_WIDTH = 1280;
     public static final float WORLD_HEIGHT = 720;
-    private int width = 15;
-    private int height = 30;
-    private int bombs = 45;
+    private int width = 5;
+    private int height = 5;
+    private int bombs = 1;
     private int time = 0;
     private long startTime = 0;
     private boolean started = false;
+    private Music backgroundMusic;
+    private boolean musicStopped = false;
 
     //Objects that allows us to write stuff
     private BitmapFont endFont;
@@ -61,6 +64,14 @@ public class GameplayScreen implements Screen {
         board = new GameBoard(this);
 
         spriteBatch = new SpriteBatch();
+
+        backgroundMusic = Gdx.audio.newMusic(
+            Gdx.files.internal("genesis-music-sonic-the-hedgehog-full-soundtrack-passion-video-games-tv-128k_TNriLs4b.wav")
+        );
+
+        backgroundMusic.setLooping(true);
+        backgroundMusic.setVolume(0.25f);
+        backgroundMusic.play();
 
         endFont = new BitmapFont();
         FreeTypeFontGenerator generator = new FreeTypeFontGenerator(Gdx.files.internal("Robot Crush.ttf"));
@@ -107,17 +118,34 @@ public class GameplayScreen implements Screen {
 
         //user input
         handlemouseClick();
-        if(board.gameOver()) {
+        if(board.hasWon() || board.hasLost()) {
             pause();
         }
         if(Gdx.input.isKeyJustPressed(Input.Keys.R)) {
             board = new GameBoard(this, width, height, bombs);
             started = false;
+            time = 0;
+            startTime = 0;
+            musicStopped = false;
+            backgroundMusic.play();
+            board.winSoundPlayed = false;
         }
 
         if(started) {
             time = (int) ((System.currentTimeMillis()-startTime) / 1000);
         }
+
+        if (!musicStopped && (board.hasWon() || board.hasLost())) {
+            backgroundMusic.stop();
+            musicStopped = true;
+        }
+
+        if (board.hasLost() || board.hasWon()) {
+            started = false;
+            board.stopUncoverSound();
+        }
+
+
 
         //all drawing of shapes MUST be in between begin/end
         shapeRenderer.begin();
@@ -129,12 +157,12 @@ public class GameplayScreen implements Screen {
         titleFont.draw(spriteBatch, "Minesweeper", 50, 700);
         infoFont.draw(spriteBatch, "Flags left: " + board.numFlags, (height * 25)+board.X_OFFSET+50, 650);
         infoFont.draw(spriteBatch, "Time: " + time, (height * 25)+board.X_OFFSET+50,625);
-        if(board.gameOver()) {
-            if (board.numFlags == 0){
+        if(board.hasWon() || board.hasLost()) {
+            if (board.hasWon()){
                 infoFont.draw(spriteBatch, "You Win!", 100, 150);
                 infoFont.draw(spriteBatch, "Press R to restart", 100, 100);
             }
-            else {
+            else if (board.hasLost()) {
                 infoFont.draw(spriteBatch, "You lost dummy", 100, 150);
                 infoFont.draw(spriteBatch, "Press R to restart", 100, 100);
             }
@@ -167,6 +195,7 @@ public class GameplayScreen implements Screen {
     public void dispose() {
         spriteBatch.dispose();
         shapeRenderer.dispose();
+        backgroundMusic.dispose();
     }
 }
 

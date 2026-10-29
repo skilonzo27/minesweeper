@@ -22,7 +22,8 @@ public class GameBoard {
     private int TILE_SIZE = 25;
     public final int X_OFFSET = 50;
     private final int Y_OFFSET = 625;
-
+    private Clip uncoverClip;
+    public boolean winSoundPlayed = false;
 
     public GameBoard(GameplayScreen gameplayScreen) {
         this.gameplayScreen = gameplayScreen;
@@ -31,7 +32,6 @@ public class GameBoard {
         numFlags = numBombs;
         firstClick = true;
         loadGraphics();
-        //placeAllBombs();
     }
     public GameBoard(GameplayScreen gameplayScreen, int numRows, int numCols, int numBombs) {
         this.gameplayScreen = gameplayScreen;
@@ -40,8 +40,6 @@ public class GameBoard {
         numFlags = this.numBombs;
         firstClick = true;
         loadGraphics();
-        placeAllBombs();
-        numberBoard();
     }
 
     private void testBoard() {
@@ -121,29 +119,57 @@ public class GameBoard {
         }
     }
 
-    public boolean gameOver() {
-        for(int i=0; i<board.length;i++){
-            for(int j=0; j<board[i].length; j++){
-                int boardValue = board[i][j];
-                if(boardValue < 8) return false;
-                else if(boardValue == 9) {
+    public boolean hasWon() {
+        if (hasLost()) return false;
+
+        for (int i = 0; i < board.length; i++) {
+            for (int j = 0; j < board[i].length; j++) {
+                int value = board[i][j];
+
+                // Hidden safe tile
+                if (value >= 0 && value <= 8) {
+                    return false;
+                }
+
+                // Flagged safe tile: still not uncovered
+                if (value >= 20 && value <= 28) {
+                    return false;
+                }
+            }
+        }
+
+        if (!winSoundPlayed) {
+            winSound();
+            winSoundPlayed = true;
+        }
+
+        return true;
+    }
+
+    public boolean hasLost() {
+        for (int[] row : board) {
+            for (int value : row) {
+                if (value == 9) {
                     return true;
                 }
             }
         }
-        return true;
+
+        return false;
     }
+
     //we +10 to uncover a tile
     public void uncoverTile(Location loc) {
-        if(gameOver()) return;
+        if(hasWon() || hasLost()) return;
         if (loc != null && isValid(loc)) {
             if(firstClick) {
-                //placeAllBombs(loc);
+                placeAllBombs(loc);
+                numberBoard();
                 firstClick = false;
             }
             int boardValue = board[loc.getRow()][loc.getCol()];
             if (boardValue == 0) {
-                fixedFloodFill(loc);
+                floodFill(loc);
             }
             else if (boardValue >= -1 && boardValue <= 8) {
                 board[loc.getRow()][loc.getCol()] += 10;
@@ -151,8 +177,19 @@ public class GameBoard {
                     showAllBombs();
                 }
             }
-            if (boardValue >= 0 && boardValue <= 8) uncoverSound();
-            else if (boardValue == -1) uncoverBomb();
+
+            if (hasWon() || hasLost()) {
+                stopUncoverSound();
+                return;
+            }
+
+            if (!hasWon() && !hasLost()) {
+                if (boardValue >= 0 && boardValue <= 8) {
+                    uncoverSound();
+                } else if (boardValue == -1) {
+                    uncoverBomb();
+                }
+            }
         }
     }
 
@@ -184,19 +221,6 @@ public class GameBoard {
         }
     }
 
-    private void fixedFloodFill(Location loc) {
-        ArrayList<Location> neighbors = getNeighbors(loc);
-        if(isValid(loc)){
-            for(Location l : neighbors){
-                int boardValue = board[l.getRow()][l.getCol()];
-                if (boardValue == 0) {
-                    board[l.getRow()][l.getCol()] += 10;
-                    fixedFloodFill(l);
-                }
-                else if(boardValue >= -1 && boardValue <= 8) board[l.getRow()][l.getCol()] += 10; return;
-            }
-        }
-    }
     private void numberBoard() {
         for(int i=0; i<board.length; i++) {
             for(int j=0; j<board[i].length; j++){
@@ -256,16 +280,27 @@ public class GameBoard {
         }
     }
 
+    private int getValue(Location l) {
+        return board[l.getRow()][l.getCol()];
+    }
+
     private void placeAllBombs(Location l) {
         int count = 0;
-        while(count < numBombs) {
-            int row = (int)(Math.random() * board.length) ;
-            int col = (int)(Math.random() * board[row].length) ;
-            //if(isFourSides(row, col, l)) continue;
-            if(!(new Location(row,col).equals(l))) {
-                board[row][col] = -1;
-                count++;
+
+        while (count < numBombs) {
+            int row = (int) (Math.random() * board.length);
+            int col = (int) (Math.random() * board[row].length);
+
+            if (row == l.getRow() && col == l.getCol()) continue;
+            ArrayList<Location> neighbors = getNeighbors(l);
+            for(Location loc : neighbors) {
+                if(getValue(loc) == -1) continue;
             }
+
+            if (board[row][col] == BOMB) continue;
+
+            board[row][col] = BOMB;
+            count++;
         }
     }
 
@@ -292,28 +327,35 @@ public class GameBoard {
         flagTile = new Texture("Screenshot 2026-10-10 at 11.07.26 PM (1) (1).jpg");
     }
 
-    private void uncoverSound(){
-        try{
-            File soundFile = new File("oh-yeah-baby-oh-yeah-sensual-male-moan-dan-barracuda-male-moan-12-oh-yeah-baby-1-0m06s.wav");
-            AudioInputStream audioStream = AudioSystem.getAudioInputStream(soundFile);
-            Clip clip = AudioSystem.getClip();
-            clip.open(audioStream);
-            clip.start();
-        }
-        catch (UnsupportedAudioFileException e){
+    private void uncoverSound() {
+        try {
+            File soundFile = new File(
+                "oh-yeah-baby-oh-yeah-sensual-male-moan-dan-barracuda-male-moan-12-oh-yeah-baby-1-0m06s.wav"
+            );
+
+            AudioInputStream audioStream =
+                AudioSystem.getAudioInputStream(soundFile);
+
+            uncoverClip = AudioSystem.getClip();
+            uncoverClip.open(audioStream);
+            uncoverClip.start();
+
+        } catch (UnsupportedAudioFileException |
+                 LineUnavailableException |
+                 IOException e) {
             e.printStackTrace();
         }
-        catch (LineUnavailableException e){
-            e.printStackTrace();
-        }
-        catch (IOException e){
-            e.printStackTrace();
+    }
+
+    public void stopUncoverSound() {
+        if (uncoverClip != null && uncoverClip.isRunning()) {
+            uncoverClip.stop();
         }
     }
 
     private void uncoverBomb(){
         try{
-            File soundFile = new File("you-been-a-bad-boy-yandere-mommy-wife-x-listener-comfort-f4m-asmrva-himerose_OVY3ziXL.wav");
+            File soundFile = new File("you-been-a-bad-boy-yandere-mommy-wife-x-listener-comfort-f4m-asmrva-himerose_1Pxz7XT3.wav");
             AudioInputStream audioStream = AudioSystem.getAudioInputStream(soundFile);
             Clip clip = AudioSystem.getClip();
             clip.open(audioStream);
@@ -340,6 +382,18 @@ public class GameBoard {
     private void flagRemoveSound(){
         try{
             File soundFile = new File("universfield-bubble-pop-06-351337_wuEwgPrc (mp3cut.net).wav");
+            AudioInputStream audioStream = AudioSystem.getAudioInputStream(soundFile);
+            Clip clip = AudioSystem.getClip();
+            clip.open(audioStream);
+            clip.start();
+        }
+        catch (UnsupportedAudioFileException | LineUnavailableException | IOException e){
+            e.printStackTrace();
+        }
+    }
+    public void winSound(){
+        try{
+            File soundFile = new File("mommy-praises-her-hardworking-boy-f4m-good-boy-appreciation-kisses-mommy-as_dWJAN0qc.wav");
             AudioInputStream audioStream = AudioSystem.getAudioInputStream(soundFile);
             Clip clip = AudioSystem.getClip();
             clip.open(audioStream);

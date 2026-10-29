@@ -2,6 +2,7 @@ package com.kilonzo;
 
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import javax.sound.sampled.*;
@@ -21,6 +22,7 @@ public class GameBoard {
     private final int mode; // 0 = Fun sounds, 1 = Classic (no custom sounds)
     private boolean firstClick = true;
     private boolean lost = false;
+    private boolean winSoundPlayed = false;
 
     private Texture emptyTile, emptyFloorTile;
     private Texture oneTile, twoTile, threeTile, fourTile;
@@ -81,20 +83,20 @@ public class GameBoard {
             if (numFlags <= 0) return;
             board[loc.getRow()][loc.getCol()] = value + 20;
             numFlags--;
-            playSound("universfield-bubble-pop-06-351337_wuEwgPrc.wav");
+            playSound("flag-on");
         } else if (value == BOMB) {
             if (numFlags <= 0) return;
             board[loc.getRow()][loc.getCol()] = 19;
             numFlags--;
-            playSound("universfield-bubble-pop-06-351337_wuEwgPrc.wav");
+            playSound("flag-on");
         } else if (value >= 20 && value <= 28) {
             board[loc.getRow()][loc.getCol()] = value - 20;
             numFlags++;
-            playSound("universfield-bubble-pop-06-351337_wuEwgPrc (mp3cut.net).wav");
+            playSound("flag-off");
         } else if (value == 19) {
             board[loc.getRow()][loc.getCol()] = BOMB;
             numFlags++;
-            playSound("universfield-bubble-pop-06-351337_wuEwgPrc (mp3cut.net).wav");
+            playSound("flag-off");
         }
     }
 
@@ -115,7 +117,7 @@ public class GameBoard {
         if (value == BOMB) {
             lost = true;
             showAllBombs();
-            playSound("you-been-a-bad-boy-yandere-mommy-wife-x-listener-comfort-f4m-asmrva-himerose_1Pxz7XT3.wav");
+            playSound("lose");
             return;
         }
 
@@ -123,7 +125,11 @@ public class GameBoard {
             if (value == 0) floodFill(loc);
             else board[row][col] = value + 10;
             if (!gameOver()) {
-                playSound("oh-yeah-baby-oh-yeah-sensual-male-moan-dan-barracuda-male-moan-12-oh-yeah-baby-1-0m06s.wav");
+                playSound("reveal");
+            }
+            if (isWon() && !winSoundPlayed) {
+                winSoundPlayed = true;
+                playSound("win");
             }
         }
     }
@@ -216,19 +222,65 @@ public class GameBoard {
         return lost || isWon();
     }
 
-    private void playSound(String filename) {
-        if (mode != 0) return;
-        try {
-            File soundFile = new File(filename);
-            AudioInputStream audioStream = AudioSystem.getAudioInputStream(soundFile);
-            Clip clip = AudioSystem.getClip();
-            clip.open(audioStream);
-            clip.start();
-        } catch (UnsupportedAudioFileException | LineUnavailableException | IOException e) {
-            e.printStackTrace();
+    // Fun mode uses the existing sound files; Classic mode uses synthesized retro beeps.
+    private void playSound(String sound) {
+        if (mode == 0) {
+            String filename;
+            switch (sound) {
+                case "flag-on": filename = "universfield-bubble-pop-06-351337_wuEwgPrc.wav"; break;
+                case "flag-off": filename = "universfield-bubble-pop-06-351337_wuEwgPrc (mp3cut.net).wav"; break;
+                case "lose": filename = "you-been-a-bad-boy-yandere-mommy-wife-x-listener-comfort-f4m-asmrva-himerose_1Pxz7XT3.wav"; break;
+                case "reveal": filename = "oh-yeah-baby-oh-yeah-sensual-male-moan-dan-barracuda-male-moan-12-oh-yeah-baby-1-0m06s.wav"; break;
+                default: playClassicSound("win"); return;
+            }
+            try {
+                AudioInputStream audioStream = AudioSystem.getAudioInputStream(new File(filename));
+                Clip clip = AudioSystem.getClip();
+                clip.open(audioStream);
+                clip.start();
+            } catch (UnsupportedAudioFileException | LineUnavailableException | IOException e) {
+                System.err.println("Could not play sound " + filename + ": " + e.getMessage());
+            }
+        } else {
+            playClassicSound(sound);
         }
     }
 
+    private void playClassicSound(String sound) {
+        float sampleRate = 22050f;
+        int[][] notes;
+        switch (sound) {
+            case "flag-on": notes = new int[][] {{1050, 65}, {1350, 55}}; break;
+            case "flag-off": notes = new int[][] {{700, 75}}; break;
+            case "reveal": notes = new int[][] {{880, 45}}; break;
+            case "lose": notes = new int[][] {{500, 130}, {360, 160}, {220, 230}}; break;
+            case "win": notes = new int[][] {{523, 90}, {659, 90}, {784, 90}, {1047, 180}}; break;
+            default: return;
+        }
+        try {
+            int totalSamples = 0;
+            for (int[] note : notes) totalSamples += (int) (sampleRate * note[1] / 1000);
+            byte[] pcm = new byte[totalSamples * 2];
+            int offset = 0;
+            for (int[] note : notes) {
+                int count = (int) (sampleRate * note[1] / 1000);
+                for (int i = 0; i < count; i++) {
+                    double envelope = Math.min(1.0, Math.min(i / 100.0, (count - i) / 300.0));
+                    short sample = (short) (Math.sin(2.0 * Math.PI * note[0] * i / sampleRate) * 9000 * Math.max(0, envelope));
+                    pcm[offset++] = (byte) (sample & 0xff);
+                    pcm[offset++] = (byte) ((sample >> 8) & 0xff);
+                }
+            }
+            AudioFormat format = new AudioFormat(sampleRate, 16, 1, true, false);
+            try (AudioInputStream stream = new AudioInputStream(new ByteArrayInputStream(pcm), format, totalSamples)) {
+                Clip clip = AudioSystem.getClip();
+                clip.open(stream);
+                clip.start();
+            }
+        } catch (LineUnavailableException | IOException e) {
+            System.err.println("Could not play Classic sound " + sound + ": " + e.getMessage());
+        }
+    }
     private void loadGraphics() {
         emptyTile = new Texture("emptyTile.jpg");
         emptyFloorTile = new Texture("empty floor.jpg");

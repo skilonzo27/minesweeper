@@ -114,11 +114,16 @@ public class GameplayScreen implements Screen {
         titleFont.draw(spriteBatch, "Minesweeper", 50, 710);
         infoFont.draw(spriteBatch, "Flags left: " + board.numFlags, 800, 650);
         infoFont.draw(spriteBatch, "Time: " + time, 800, 615);
+        String difficultyName = rows == 9 && cols == 9 ? "Easy"
+                : rows == 16 && cols == 16 ? "Medium" : "Hard";
+        String modeName = mode == 0 ? "Fun" : "Classic";
+        infoFont.draw(spriteBatch, "Difficulty: " + difficultyName, 800, 580);
+        infoFont.draw(spriteBatch, "Mode: " + modeName, 800, 545);
 
         if (board.gameOver()) {
-            infoFont.draw(spriteBatch, board.isWon() ? "You Win!" : "Game Over", 800, 550);
-            infoFont.draw(spriteBatch, "Press R to restart", 800, 510);
-            infoFont.draw(spriteBatch, "Press ESC for menu", 800, 475);
+            infoFont.draw(spriteBatch, board.isWon() ? "You Win!" : "Game Over", 800, 500);
+            infoFont.draw(spriteBatch, "Press R to restart", 800, 465);
+            infoFont.draw(spriteBatch, "Press ESC for menu", 800, 430);
         }
         spriteBatch.end();
     }

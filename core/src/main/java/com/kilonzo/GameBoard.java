@@ -6,313 +6,230 @@ import java.io.File;
 import java.io.IOException;
 import javax.sound.sampled.*;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public class GameBoard {
-    private int[][] board;
-    private int numBombs; // total number of bombs in grid
-    public int numFlags; //the number of flags remaining to be placed by the player
-    public static final int BOMB = -1; //constant help with readability
-    private GameplayScreen gameplayScreen; //reference link back to the GameplayScreen
-    private Texture emptyTile;
-    private Texture emptyFloorTile;
-    private Texture oneTile, twoTile, threeTile, fourTile, fiveTile, sixTile, sevenTile, eightTile;
-    private Texture bombTile;
-    private Texture flagTile;
-    private boolean firstClick;
-    private int TILE_SIZE = 25;
+    public static final int BOMB = -1;
     public final int X_OFFSET = 50;
-    private final int Y_OFFSET = 625;
-    private Clip uncoverClip;
-    public boolean winSoundPlayed = false;
+    private static final int TILE_SIZE = 20;
+    private static final int Y_OFFSET = 660;
 
-    public GameBoard(GameplayScreen gameplayScreen) {
-        this.gameplayScreen = gameplayScreen;
-        board = new int[16][30];
-        numBombs = 50;
-        numFlags = numBombs;
-        firstClick = true;
+    private int[][] board;
+    private final int numBombs;
+    public int numFlags;
+    private final int mode; // 0 = Fun sounds, 1 = Classic (no custom sounds)
+    private boolean firstClick = true;
+    private boolean lost = false;
+
+    private Texture emptyTile, emptyFloorTile;
+    private Texture oneTile, twoTile, threeTile, fourTile;
+    private Texture fiveTile, sixTile, sevenTile, eightTile;
+    private Texture bombTile, flagTile;
+
+    public GameBoard(GameplayScreen gameplayScreen, int rows, int cols, int numBombs, int mode) {
+        this.numBombs = Math.min(numBombs, Math.max(0, rows * cols - 5));
+        this.numFlags = this.numBombs;
+        this.mode = mode;
+        this.board = new int[rows][cols];
         loadGraphics();
     }
-    public GameBoard(GameplayScreen gameplayScreen, int numRows, int numCols, int numBombs) {
-        this.gameplayScreen = gameplayScreen;
-        board = new int[numRows][numCols];
-        this.numBombs = numBombs;
-        numFlags = this.numBombs;
-        firstClick = true;
-        loadGraphics();
-    }
 
-    private void testBoard() {
-        board[0][0] = 11;
-        board[0][1] = 12;
-        board[0][2] = 13;
-        board[0][3] = 14;
-        board[0][4] = 15;
-        board[1][0] = 16;
-        board[1][1] = 17;
-        board[1][2] = 18;
-        board[1][3] = 9;
-        board[1][4] = -1;
-        board[2][0] = 21;
-        board[2][1] = 10;
-    }
+    public void draw(SpriteBatch batch) {
+        for (int row = 0; row < board.length; row++) {
+            for (int col = 0; col < board[row].length; col++) {
+                int x = X_OFFSET + TILE_SIZE * col;
+                int y = Y_OFFSET - TILE_SIZE * row;
+                int value = board[row][col];
 
-    public void draw(SpriteBatch spriteBatch) {
-            for (int i = 0; i < board.length; i++) {
-                for (int j = 0; j < board[i].length; j++) {
-                    int x = X_OFFSET + (TILE_SIZE * j);
-                    int y = Y_OFFSET - (TILE_SIZE * i);
-                    int value = board[i][j];
-                    if (value <= 8) spriteBatch.draw(emptyTile, x, y);
-                    else if (value == 9) spriteBatch.draw(bombTile, x, y);
-                    else if (value == 10) spriteBatch.draw(emptyFloorTile, x, y);
-                    else if (value == 11) spriteBatch.draw(oneTile, x, y);
-                    else if (value == 12) spriteBatch.draw(twoTile, x, y);
-                    else if (value == 13) spriteBatch.draw(threeTile, x, y);
-                    else if (value == 14) spriteBatch.draw(fourTile, x, y);
-                    else if (value == 15) spriteBatch.draw(fiveTile, x, y);
-                    else if (value == 16) spriteBatch.draw(sixTile, x, y);
-                    else if (value == 17) spriteBatch.draw(sevenTile, x, y);
-                    else if (value == 18) spriteBatch.draw(eightTile, x, y);
-                    else if (value >= 19) spriteBatch.draw(flagTile, x, y);
-                }
-            }
-    }
-
-    /*given a (mouse_x, mouse_y) position,
-    return the location on the board [row][col].
-    Return null if Lcation is not valid
-     */
-    public Location getTileAt(int mouse_x, int mouse_y) {
-        int x = 0, y = 0;
-        x = (mouse_x - X_OFFSET) /TILE_SIZE;
-        y = ((Y_OFFSET + mouse_y) / TILE_SIZE) - 28;
-        //if (mouse_y > (GameplayScreen.WORLD_HEIGHT-Y_OFFSET-TILE_SIZE) / TILE_SIZE){
-       //     y =(int)(GameplayScreen.WORLD_HEIGHT-Y_OFFSET-TILE_SIZE) / TILE_SIZE;
-        //}
-        Location l = new Location(x,y);
-        /*if(firstClick) {
-            placeAllBombs(l);
-            firstClick = false;
-            return l;
-        }*/
-        if(isValid(l)) return l;
-        return null;
-    }
-
-    public void changeFlagStatus(Location loc){
-        if(loc != null && isValid(loc)) {
-            int boardValue = board[loc.getRow()][loc.getCol()];
-            if(numFlags == 0){
-                if(boardValue < 19) return;
-            }
-            if(boardValue >= -1 && boardValue <= 8) {
-                board[loc.getRow()][loc.getCol()] += 20;
-                numFlags--;
-                flagSound();
-            }
-            else if(boardValue >= 19 && boardValue <= 28) {
-                board[loc.getRow()][loc.getCol()] -= 20;
-                numFlags++;
-                flagRemoveSound();
+                if (value <= 8) batch.draw(emptyTile, x, y, TILE_SIZE, TILE_SIZE);
+                else if (value == 9) batch.draw(bombTile, x, y, TILE_SIZE, TILE_SIZE);
+                else if (value == 10) batch.draw(emptyFloorTile, x, y, TILE_SIZE, TILE_SIZE);
+                else if (value >= 11 && value <= 18) {
+                    batch.draw(getNumberTexture(value - 10), x, y, TILE_SIZE, TILE_SIZE);
+                } else if (value >= 19) batch.draw(flagTile, x, y, TILE_SIZE, TILE_SIZE);
             }
         }
     }
 
-    public boolean hasWon() {
-        if (hasLost()) return false;
-
-        for (int i = 0; i < board.length; i++) {
-            for (int j = 0; j < board[i].length; j++) {
-                int value = board[i][j];
-
-                // Hidden safe tile
-                if (value >= 0 && value <= 8) {
-                    return false;
-                }
-
-                // Flagged safe tile: still not uncovered
-                if (value >= 20 && value <= 28) {
-                    return false;
-                }
-            }
+    private Texture getNumberTexture(int n) {
+        switch (n) {
+            case 1: return oneTile;
+            case 2: return twoTile;
+            case 3: return threeTile;
+            case 4: return fourTile;
+            case 5: return fiveTile;
+            case 6: return sixTile;
+            case 7: return sevenTile;
+            default: return eightTile;
         }
-
-        if (!winSoundPlayed) {
-            winSound();
-            winSoundPlayed = true;
-        }
-
-        return true;
     }
 
-    public boolean hasLost() {
-        for (int[] row : board) {
-            for (int value : row) {
-                if (value == 9) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+    // Mouse coordinates must already be converted to world coordinates.
+    public Location getTileAt(int mouseX, int mouseY) {
+        int col = (mouseX - X_OFFSET) / TILE_SIZE;
+        int row = (Y_OFFSET + TILE_SIZE - 1 - mouseY) / TILE_SIZE;
+        if (mouseX < X_OFFSET || mouseY > Y_OFFSET + TILE_SIZE - 1) return null;
+        Location loc = new Location(row, col);
+        return isValid(loc) ? loc : null;
     }
 
-    //we +10 to uncover a tile
+    public void changeFlagStatus(Location loc) {
+        if (loc == null || !isValid(loc) || lost || firstClick || isWon()) return;
+        int value = board[loc.getRow()][loc.getCol()];
+        if (value >= 0 && value <= 8) {
+            if (numFlags <= 0) return;
+            board[loc.getRow()][loc.getCol()] = value + 20;
+            numFlags--;
+            playSound("universfield-bubble-pop-06-351337_wuEwgPrc.wav");
+        } else if (value == BOMB) {
+            if (numFlags <= 0) return;
+            board[loc.getRow()][loc.getCol()] = 19;
+            numFlags--;
+            playSound("universfield-bubble-pop-06-351337_wuEwgPrc.wav");
+        } else if (value >= 20 && value <= 28) {
+            board[loc.getRow()][loc.getCol()] = value - 20;
+            numFlags++;
+            playSound("universfield-bubble-pop-06-351337_wuEwgPrc (mp3cut.net).wav");
+        } else if (value == 19) {
+            board[loc.getRow()][loc.getCol()] = BOMB;
+            numFlags++;
+            playSound("universfield-bubble-pop-06-351337_wuEwgPrc (mp3cut.net).wav");
+        }
+    }
+
     public void uncoverTile(Location loc) {
-        if(hasWon() || hasLost()) return;
-        if (loc != null && isValid(loc)) {
-            if(firstClick) {
-                placeAllBombs(loc);
-                numberBoard();
-                firstClick = false;
-            }
-            int boardValue = board[loc.getRow()][loc.getCol()];
-            if (boardValue == 0) {
-                floodFill(loc);
-            }
-            else if (boardValue >= -1 && boardValue <= 8) {
-                board[loc.getRow()][loc.getCol()] += 10;
-                if (boardValue == -1) {
-                    showAllBombs();
-                }
-            }
+        if (loc == null || !isValid(loc) || gameOver()) return;
 
-            if (hasWon() || hasLost()) {
-                stopUncoverSound();
-                return;
-            }
+        if (firstClick) {
+            placeAllBombs(loc);
+            numberBoard();
+            firstClick = false;
+        }
 
-            if (!hasWon() && !hasLost()) {
-                if (boardValue >= 0 && boardValue <= 8) {
-                    uncoverSound();
-                } else if (boardValue == -1) {
-                    uncoverBomb();
-                }
+        int row = loc.getRow();
+        int col = loc.getCol();
+        int value = board[row][col];
+        if (value >= 19) return;
+
+        if (value == BOMB) {
+            lost = true;
+            showAllBombs();
+            playSound("you-been-a-bad-boy-yandere-mommy-wife-x-listener-comfort-f4m-asmrva-himerose_1Pxz7XT3.wav");
+            return;
+        }
+
+        if (value >= 0 && value <= 8) {
+            if (value == 0) floodFill(loc);
+            else board[row][col] = value + 10;
+            if (!gameOver()) {
+                playSound("oh-yeah-baby-oh-yeah-sensual-male-moan-dan-barracuda-male-moan-12-oh-yeah-baby-1-0m06s.wav");
             }
         }
     }
 
-    //recursive algorithm
-    /*
-        If it's a zero
-        +10
-        recursive call on my 4 neighbors
-        if it's -1 to 8
-        +10
-         */
     private void floodFill(Location loc) {
-        int boardValue = board[loc.getRow()][loc.getCol()];
-        if(isValid(loc)) {
-            if (boardValue == 0) {
-                board[loc.getRow()][loc.getCol()] += 10;
-                Location l1 = new Location(loc.getCol()+1, loc.getRow());
-                Location l2 = new Location(loc.getCol()-1, loc.getRow());
-                Location l3 = new Location(loc.getCol(), loc.getRow()+1);
-                Location l4 = new Location(loc.getCol(), loc.getRow()-1);
-                if(isValid(l1)) floodFill(l1);
-                if(isValid(l2)) floodFill(l2);
-                if(isValid(l3)) floodFill(l3);
-                if(isValid(l4)) floodFill(l4);
-            } else if (boardValue >= -1 && boardValue <= 8) {
-                board[loc.getRow()][loc.getCol()] += 10;
-                return;
-            }
+        if (!isValid(loc)) return;
+        int row = loc.getRow();
+        int col = loc.getCol();
+        int value = board[row][col];
+        if (value < 0 || value > 8) return;
+
+        board[row][col] = value + 10;
+        if (value == 0) {
+            for (Location neighbor : getNeighbors(loc)) floodFill(neighbor);
         }
     }
 
     private void numberBoard() {
-        for(int i=0; i<board.length; i++) {
-            for(int j=0; j<board[i].length; j++){
-                if(board[i][j] == -1) continue;
-                int num = 0;
-                ArrayList<Location> neighbors = getNeighbors(new Location(i,j));
-                for(Location l : neighbors) {
-                    if(board[l.getRow()][l.getCol()] == -1){
-                        num++;
-                    }
+        for (int row = 0; row < board.length; row++) {
+            for (int col = 0; col < board[row].length; col++) {
+                if (board[row][col] == BOMB) continue;
+                int count = 0;
+                for (Location neighbor : getNeighbors(new Location(row, col))) {
+                    if (board[neighbor.getRow()][neighbor.getCol()] == BOMB) count++;
                 }
-                board[i][j] = num;
+                board[row][col] = count;
             }
         }
     }
-    //return true if loc is valid in the grid
+
     private boolean isValid(Location loc) {
-        boolean x = loc.getCol() < board[0].length && loc.getCol() > -1;
-        boolean y = loc.getRow() < board.length && loc.getRow() > -1;
-        return y && x;
+        return loc != null && loc.getRow() >= 0 && loc.getRow() < board.length
+                && loc.getCol() >= 0 && loc.getCol() < board[0].length;
     }
 
-    //returns 3-8 Locations that neighbor the given loc
     private ArrayList<Location> getNeighbors(Location loc) {
-        ArrayList<Location> locs = new ArrayList<>();
-
-        for(int i=loc.getRow()-1; i <= loc.getRow()+1; i++) {
-            for(int j=loc.getCol()-1; j <= loc.getCol()+1; j++){
-                Location l = new Location(i,j);
-                if(isValid(l)) {
-                    locs.add(l);
-                }
+        ArrayList<Location> neighbors = new ArrayList<>();
+        for (int row = loc.getRow() - 1; row <= loc.getRow() + 1; row++) {
+            for (int col = loc.getCol() - 1; col <= loc.getCol() + 1; col++) {
+                if (row == loc.getRow() && col == loc.getCol()) continue;
+                Location candidate = new Location(row, col);
+                if (isValid(candidate)) neighbors.add(candidate);
             }
         }
-        return locs;
+        return neighbors;
+    }
+
+    private void placeAllBombs(Location first) {
+        List<Location> candidates = new ArrayList<>();
+        for (int row = 0; row < board.length; row++) {
+            for (int col = 0; col < board[row].length; col++) {
+                if (row == first.getRow() && col == first.getCol()) continue;
+                if (isOrthogonalNeighbor(row, col, first)) continue;
+                candidates.add(new Location(row, col));
+            }
+        }
+        Collections.shuffle(candidates);
+        for (int i = 0; i < Math.min(numBombs, candidates.size()); i++) {
+            Location loc = candidates.get(i);
+            board[loc.getRow()][loc.getCol()] = BOMB;
+        }
+    }
+
+    private boolean isOrthogonalNeighbor(int row, int col, Location first) {
+        int dr = Math.abs(row - first.getRow());
+        int dc = Math.abs(col - first.getCol());
+        return (dr == 1 && dc == 0) || (dr == 0 && dc == 1);
     }
 
     private void showAllBombs() {
-        for(int i=0; i<board.length; i++){
-            for(int j=0; j<board[i].length; j++){
-                if(board[i][j] == -1) {
-                    board[i][j] += 10;
-                }
+        for (int row = 0; row < board.length; row++) {
+            for (int col = 0; col < board[row].length; col++) {
+                if (board[row][col] == BOMB || board[row][col] == 19) board[row][col] = 9;
             }
         }
-        uncoverBomb();
     }
 
-    private void placeAllBombs() {
-        int count = numBombs;
-        while(count > 0) {
-            int row = (int)(Math.random() * board.length) ;
-            int col = (int)(Math.random() * board[row].length) ;
-
-            board[row][col] = -1;
-            count--;
-        }
-    }
-
-    private int getValue(Location l) {
-        return board[l.getRow()][l.getCol()];
-    }
-
-    private void placeAllBombs(Location l) {
-        int count = 0;
-
-        while (count < numBombs) {
-            int row = (int) (Math.random() * board.length);
-            int col = (int) (Math.random() * board[row].length);
-
-            if (row == l.getRow() && col == l.getCol()) continue;
-            ArrayList<Location> neighbors = getNeighbors(l);
-            for(Location loc : neighbors) {
-                if(getValue(loc) == -1) continue;
+    public boolean isWon() {
+        if (lost) return false;
+        for (int row = 0; row < board.length; row++) {
+            for (int col = 0; col < board[row].length; col++) {
+                int value = board[row][col];
+                if (value != BOMB && value != 19 && !(value >= 10 && value <= 18)) return false;
             }
+        }
+        return !firstClick;
+    }
 
-            if (board[row][col] == BOMB) continue;
+    public boolean gameOver() {
+        return lost || isWon();
+    }
 
-            board[row][col] = BOMB;
-            count++;
+    private void playSound(String filename) {
+        if (mode != 0) return;
+        try {
+            File soundFile = new File(filename);
+            AudioInputStream audioStream = AudioSystem.getAudioInputStream(soundFile);
+            Clip clip = AudioSystem.getClip();
+            clip.open(audioStream);
+            clip.start();
+        } catch (UnsupportedAudioFileException | LineUnavailableException | IOException e) {
+            e.printStackTrace();
         }
     }
 
-    private boolean isFourSides(int r, int c, Location l){
-        if(l.getRow()-1 == r && l.getCol() == c) return true;
-        if(l.getRow()+1 == r && l.getCol() == c) return true;
-        if(l.getRow() == r && l.getCol()+1 == c) return true;
-        if(l.getRow() == r && l.getCol()-1 == c) return true;
-        return false;
-    }
-
-    public void loadGraphics() {
+    private void loadGraphics() {
         emptyTile = new Texture("emptyTile.jpg");
         emptyFloorTile = new Texture("empty floor.jpg");
         oneTile = new Texture("oneTile.jpg");
@@ -324,83 +241,21 @@ public class GameBoard {
         sevenTile = new Texture("sevenTile.jpg");
         eightTile = new Texture("eightTile.jpg");
         bombTile = new Texture("IMG_4958 (1) (1).jpeg");
-        flagTile = new Texture("Screenshot 2026-10-10 at 11.07.26 PM (1) (1).jpg");
+        flagTile = new Texture("Screenshot 2026-10-10 at 11.07.26 PM (1) (1).jpg");
     }
 
-    private void uncoverSound() {
-        try {
-            File soundFile = new File(
-                "oh-yeah-baby-oh-yeah-sensual-male-moan-dan-barracuda-male-moan-12-oh-yeah-baby-1-0m06s.wav"
-            );
-
-            AudioInputStream audioStream =
-                AudioSystem.getAudioInputStream(soundFile);
-
-            uncoverClip = AudioSystem.getClip();
-            uncoverClip.open(audioStream);
-            uncoverClip.start();
-
-        } catch (UnsupportedAudioFileException |
-                 LineUnavailableException |
-                 IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public void stopUncoverSound() {
-        if (uncoverClip != null && uncoverClip.isRunning()) {
-            uncoverClip.stop();
-        }
-    }
-
-    private void uncoverBomb(){
-        try{
-            File soundFile = new File("you-been-a-bad-boy-yandere-mommy-wife-x-listener-comfort-f4m-asmrva-himerose_1Pxz7XT3.wav");
-            AudioInputStream audioStream = AudioSystem.getAudioInputStream(soundFile);
-            Clip clip = AudioSystem.getClip();
-            clip.open(audioStream);
-            clip.start();
-        }
-        catch (UnsupportedAudioFileException | LineUnavailableException | IOException e){
-            e.printStackTrace();
-        }
-    }
-
-    private void flagSound(){
-        try{
-            File soundFile = new File("universfield-bubble-pop-06-351337_wuEwgPrc.wav");
-            AudioInputStream audioStream = AudioSystem.getAudioInputStream(soundFile);
-            Clip clip = AudioSystem.getClip();
-            clip.open(audioStream);
-            clip.start();
-        }
-        catch (UnsupportedAudioFileException | LineUnavailableException | IOException e){
-            e.printStackTrace();
-        }
-    }
-
-    private void flagRemoveSound(){
-        try{
-            File soundFile = new File("universfield-bubble-pop-06-351337_wuEwgPrc (mp3cut.net).wav");
-            AudioInputStream audioStream = AudioSystem.getAudioInputStream(soundFile);
-            Clip clip = AudioSystem.getClip();
-            clip.open(audioStream);
-            clip.start();
-        }
-        catch (UnsupportedAudioFileException | LineUnavailableException | IOException e){
-            e.printStackTrace();
-        }
-    }
-    public void winSound(){
-        try{
-            File soundFile = new File("mommy-praises-her-hardworking-boy-f4m-good-boy-appreciation-kisses-mommy-as_dWJAN0qc.wav");
-            AudioInputStream audioStream = AudioSystem.getAudioInputStream(soundFile);
-            Clip clip = AudioSystem.getClip();
-            clip.open(audioStream);
-            clip.start();
-        }
-        catch (UnsupportedAudioFileException | LineUnavailableException | IOException e){
-            e.printStackTrace();
-        }
+    public void dispose() {
+        if (emptyTile != null) emptyTile.dispose();
+        if (emptyFloorTile != null) emptyFloorTile.dispose();
+        if (oneTile != null) oneTile.dispose();
+        if (twoTile != null) twoTile.dispose();
+        if (threeTile != null) threeTile.dispose();
+        if (fourTile != null) fourTile.dispose();
+        if (fiveTile != null) fiveTile.dispose();
+        if (sixTile != null) sixTile.dispose();
+        if (sevenTile != null) sevenTile.dispose();
+        if (eightTile != null) eightTile.dispose();
+        if (bombTile != null) bombTile.dispose();
+        if (flagTile != null) flagTile.dispose();
     }
 }
